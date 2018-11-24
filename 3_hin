@@ -1,0 +1,317 @@
+package trzech_hindusow;
+
+import java.io.FileNotFoundException;
+import javax.swing.JOptionPane;
+import static trzech_hindusow.Metody.*;
+import java.io.PrintWriter;
+
+public class Trzech_hindusow {
+    public static int O[][];    //tablica robocza
+    public static int Om[][];  //odcinki w macierzy
+    public static int Om_KROK_X[][];                            //robocza tablica
+    public static int Om_poczatek[][];  //odcinki w macierzy
+    public static int Om_przeplyw[][];
+    public static int Om_koncowe[][];
+    public static int il_pkt=8; //ilosc punktow
+    public static int start=1;  //punkt startowy        //      ma być 0
+    public static int max = Integer.MAX_VALUE; //interpretowane jako nieskończoność w macierzy
+    public static String dane_wejsciowe = "wejscie.txt";
+    public static int odleglosc_od_zrodla[];
+    public static int przepustowosc[];
+    public static int usuniete_przeplywy[][];
+    public static int usuniete_przeplywy2[][];
+    public static int ts = 0;
+    public static int ts_krok = 0;
+    public static int blokujace_punkty[];
+    
+    private static void konstruujemy_siec_warstwowa() {    //////// zamienilem Om2 na Om
+        odleglosc_od_zrodla = wyliczam_odl_od_zrodla(Om, odleglosc_od_zrodla, max, start);
+        Om = usowam_zbedne(Om,odleglosc_od_zrodla,max);
+        //for (int i = 0; i < odleglosc_od_zrodla.length; i++)
+            //System.out.println( " odleglosc_od_zrodla " + odleglosc_od_zrodla[i]);
+        //return odleglosc_od_zrodla;
+    }
+    private static int [] tworzenie_kolejnych_odleglosci_od_zrodla(int odleglosc_od_zrodla[], int max, int start){
+        for (int i = 0; i < odleglosc_od_zrodla.length; i++)
+            odleglosc_od_zrodla[i]=max;
+        odleglosc_od_zrodla[start]=0;
+        for (int i = 0; i < Om.length; i++)
+            if(Om[start][i]!=max){
+                odleglosc_od_zrodla[i]=1;
+                System.out.println("i: " + i);
+            }
+        return odleglosc_od_zrodla;
+    }
+    
+    public static int [] wyliczam_odl_od_zrodla(int Om[][], int odleglosc_od_zrodla[], int max, int start) {
+        odleglosc_od_zrodla = tworzenie_kolejnych_odleglosci_od_zrodla(odleglosc_od_zrodla, max, start);
+        
+        //int sprmax = odleglosc_od_zrodla.length;
+        System.out.println("odl od zr " + odleglosc_od_zrodla.length + " om " + Om.length);
+        for (int spr = 0; spr < odleglosc_od_zrodla.length; spr++)
+            for (int j = 0; j < odleglosc_od_zrodla.length; j++){
+                int zmienna = odleglosc_od_zrodla[j];
+                if(zmienna==spr){
+                        System.out.println("block " + j);
+                        for (int i = 0; i < Om.length; i++)
+                            if(Om[j][i]!=max){
+                                if(odleglosc_od_zrodla[i]==max)
+                                    odleglosc_od_zrodla[i]=spr+1;
+                                //System.out.println("i: " +i + " Om "+ Om[j][i]);
+                            }
+                }
+            }
+        return odleglosc_od_zrodla;
+    }
+    
+    private static int [] wyliczamy_przepustowosc(int przepustowosc[], int T[][]) {
+        for (int pkt = 2; pkt < T.length; pkt++) {
+            int spr=0, spr2=0;
+            for (int i = 0; i < T.length; i++)
+                if(T[pkt][i]!=max)
+                    spr+=T[pkt][i];
+            for (int j = 0; j < T.length; j++)
+                if(T[j][pkt]!=max)
+                    spr2+=T[j][pkt];
+            if(spr>spr2)
+                spr=spr2;
+            przepustowosc[1]=0;
+            przepustowosc[pkt]=spr;
+            //System.out.println("spr. przepustowosc: " + spr);
+        }
+        return przepustowosc;
+    }
+    
+    public static void zapis(int Om_poczatkowe[][], int koncowa[]) throws FileNotFoundException {
+      String dane_wyjsciowe = "prim_wynik.txt";
+      dane_wyjsciowe = JOptionPane.showInputDialog( "Do jakiego pliku zapisać." ,  dane_wyjsciowe);
+      PrintWriter zapis = new PrintWriter(dane_wyjsciowe);
+      zapis_macierzy2(zapis, O, "Poczatkowe odcinki.");
+      zapis_macierzy(zapis, Om_poczatkowe, "Poczatkowa macierz.");
+      zapis_macierzy(zapis, Om, "Odcinki sieci warstwowej.");
+      zapis.println("Blokujace punkty.");
+      for (int i = 0; i < blokujace_punkty.length; i++) {
+          if(blokujace_punkty[i]!=il_pkt)
+            zapis.println("" + blokujace_punkty[i]);
+      }
+      //zapis_macierzy(zapis, Om_KROK_X, "W tym ktoku to.");
+      zapis_macierzy2(zapis, usuniete_przeplywy, "Kolejno dodawane odcinki dla przepływow.");
+      zapis_macierzy(zapis, Om_koncowe, "Odcinki koncowe.");
+
+            zapis.println("");
+      zapis.close();
+    }
+    
+    public static void zapis_macierzy2(PrintWriter zapis, int Om_poczatkowe[][], String txt) throws FileNotFoundException {
+         
+      String linia;
+      zapis.println(txt);
+      for (int i = 0; i <  Om_poczatkowe.length; i++){
+      linia="";
+          for (int j = 0; j < Om_poczatkowe[0].length; j++)
+                linia +=Om_poczatkowe[i][j] + "\t";
+      zapis.println(linia);
+      }
+     }
+    
+     public static void zapis_macierzy(PrintWriter zapis, int Om_poczatkowe[][], String txt) throws FileNotFoundException {
+         
+      String linia;
+      zapis.println(txt);
+      for (int i = 1; i <  Om_poczatkowe.length; i++){
+      linia="";
+          for (int j = 1; j < Om_poczatkowe.length; j++)
+            if(Om_poczatkowe[i][j]!=max)
+                linia +=Om_poczatkowe[i][j] + "\t";
+            else
+                linia +="∞\t";
+      zapis.println(linia);
+      }
+     }
+    
+    private static int wybieramy_wierzcholek() {
+        int p1 = max, wynik = przepustowosc.length-1;
+        for (int i = 2; i < przepustowosc.length-1; i++) {
+            if(przepustowosc[i] < p1 & przepustowosc[i] > 0){
+                p1 = przepustowosc[i];
+                wynik = i;
+            }
+        }
+        return wynik;
+    }
+    private static void usuniecie_przeplywu(int a, int b, int waga){
+                    usuniete_przeplywy[ts][0]=a;
+                    usuniete_przeplywy[ts][1]=b;
+                    usuniete_przeplywy[ts++][2]=waga;
+    }
+    private static void usuniecie_prawej(int a, int w1){
+        for (int i = 1; i < przepustowosc.length; i++) {
+            if(Om_przeplyw[a][i]!=max&Om_przeplyw[a][i]!=0){
+                if(Om_przeplyw[a][i]<=w1){
+                    usuniecie_przeplywu(a,i,Om_przeplyw[a][i]);
+                    w1-=Om_przeplyw[a][i];
+                    Om_przeplyw[a][i]=0;
+                }
+                else{
+                    usuniecie_przeplywu(a,i,w1);
+                    Om_przeplyw[a][i]-=w1;
+                    w1=0;
+                }
+            } 
+        }
+    }
+    private static void usuniecie_lewej(int a, int w1){
+        System.out.println("nr pkt " + a + " przeplyw " + w1);
+        for (int i = 1; i < przepustowosc.length; i++) {
+            if(Om_przeplyw[i][a]!=max&Om_przeplyw[i][a]!=0){
+                System.out.println(i + " " + a + " waga " + Om_przeplyw[i][a]);
+                if(Om_przeplyw[i][a]<=w1){
+                    usuniecie_przeplywu(i,a,Om_przeplyw[i][a]);
+                    w1-=Om_przeplyw[i][a];
+                    Om_przeplyw[i][a]=0;
+                }
+                else{
+                    usuniecie_przeplywu(i,a,w1);
+                    Om_przeplyw[i][a]-=w1;
+                    w1=0;
+                }
+            } 
+        }
+    }
+    
+    private static void zmniejszamy_przeplyw(int a) {
+        int wartosc = przepustowosc[a];
+        przepustowosc[a]=0;
+        System.out.println("poczatek");
+        //////////////////////////////////petla_prawej - moge dodawac wierzchoki do listy az bede mial calosc
+            usuniecie_prawej(a,wartosc);
+            //ts_krok++;
+        while(ts_krok++!=ts)
+            //if(usuniete_przeplywy[ts_krok][1]!=il_pkt & ts_krok!=ts)
+           // if(ts_krok++!=ts)
+                usuniecie_prawej(usuniete_przeplywy[ts_krok-1][1],usuniete_przeplywy[ts_krok-1][2]);
+           // else
+           //     break;
+        //System.out.println("\n\n\nts " + ts + " ts_krok " + ts_krok);
+        ts_krok = ts;
+        usuniecie_lewej(a,wartosc);
+        System.out.println("start lewa");
+        while(ts_krok++!=ts){
+            //System.out.println("lewa: " + ts_krok + " " + usuniete_przeplywy[ts_krok][0] + " " + usuniete_przeplywy[ts_krok][1] + " " + usuniete_przeplywy[ts_krok][2]);
+            //if(usuniete_przeplywy[ts_krok][0]!=start & ts_krok!=ts)
+            //if(ts_krok++!=ts)
+                usuniecie_lewej(usuniete_przeplywy[ts_krok-1][0],usuniete_przeplywy[ts_krok-1][2]);
+           // else
+                //break;
+        }
+        //System.out.println("ts " + ts + " ts_krok " + ts_krok);
+        ts_krok = ts;
+        System.out.println("spr nowy przeplyw z pkt " + a + " zmniejszony o " + wartosc);
+        wypisanie_punktów_Tab2_Max_podpis_startOd(usuniete_przeplywy, max,"Poczatkowe połączenia w macierzy.",0);
+        wypisanie_listy(przepustowosc, max, "Przepustowosc.");
+    }
+    
+
+    private static void glowny_kod() {
+        usuniete_przeplywy = new int [il_pkt*3][3];
+        boolean spr = true;
+        int a = 0;
+        Om_przeplyw = kopiowanie_z_2_do_1(Om_przeplyw, Om);
+        int il_krow = 14, bk=0;
+        blokujace_punkty= new int [il_krow];
+        
+        while(a!=il_krow ){
+            int aaa = wybieramy_wierzcholek();
+            System.out.println("\n\n\n\nkrok " + a + " wierzcholek: " + aaa);
+            blokujace_punkty[bk++]=aaa;
+            zmniejszamy_przeplyw(aaa);
+            //przepustowosc.length-1
+            usowam_zbedne_pkt();
+            usowam_zbedne_pkt();
+            //if(aaa == przepustowosc.length-1)
+                //spr=false;
+                a++;
+        }
+        //usuniete_przeplywy
+        koncowa_macierz();
+
+        wypisanie_punktów_Tab2_Max_podpis_startOd(usuniete_przeplywy, max,"Usuniete przeplywy.",0);
+        wypisanie_punktów_Tab2_Max_podpis_startOd(usuniete_przeplywy2, max,"Usuniete przeplywy 2.",0);
+        wypisanie_punktów_Tab2_Max_podpis_startOd(Om_koncowe, max,"koncowa macierz.",1);
+        
+    }
+    
+
+    private static void koncowa_macierz() {
+
+        usuniete_przeplywy2 = new int [ts][3];
+        for (int i = 0; i < ts; i++) {
+            for (int j = 0; j < 3; j++) {
+                usuniete_przeplywy2[i][j]=usuniete_przeplywy[i][j];
+            }
+        }
+        for (int i = 0; i < ts; i++) {
+            for (int j = 0; j < ts; j++) {
+                if(usuniete_przeplywy2[i][0]== usuniete_przeplywy2[j][0]&usuniete_przeplywy2[i][1]== usuniete_przeplywy2[j][1]& i !=j){
+                    usuniete_przeplywy2[i][2]+=usuniete_przeplywy2[j][2];
+                    usuniete_przeplywy2[j][0]=0;usuniete_przeplywy2[j][1]=0;usuniete_przeplywy2[j][2]=0;
+                }
+            }
+        }
+        Om_koncowe = twożenie_maciezy_z_do_ilePkt_brakPoloczenia(usuniete_przeplywy2, Om_koncowe, il_pkt+1, max);
+    }
+    private static void usowam_zbedne_pkt() {
+        wypisanie_punktów_Tab2_Max_podpis_startOd(Om_przeplyw, max,"Po kroku.",1);
+        for (int i = 2; i < przepustowosc.length-1; i++) {
+            if(przepustowosc[i]==0){
+                System.out.println(i + " ok " + przepustowosc[i]);
+                for (int j = 0; j < Om_przeplyw.length; j++) {
+                    if (Om_przeplyw[j][i]!= max)
+                        Om_przeplyw[j][i]=0;
+                    if (Om_przeplyw[i][j]!= max)   
+                        Om_przeplyw[i][j]=0;
+                }
+            }
+        }
+        przepustowosc = wyliczamy_przepustowosc(przepustowosc, Om_przeplyw);
+        //Om_przeplyw[3][6]=0;
+        wypisanie_punktów_Tab2_Max_podpis_startOd(Om_przeplyw, max,"Po kasacji.",1);
+    }
+ //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    public static void main(String[] args) throws FileNotFoundException{
+        odczyt();
+        tworzenie_tablic();
+        
+        System.out.println("Konstruujemy siec warstwowa.");
+        konstruujemy_siec_warstwowa();
+        wypisanie_punktów_Tab2_Max_podpis_startOd(Om, max,"Om2 tablica po usunieciu zbednych polaczen",1);
+        System.out.println("Wyliczam odleglosci ze zrodla do pozostalych wierzcholkow.");
+        przepustowosc = wyliczamy_przepustowosc(przepustowosc, Om);
+        wypisanie_listy(przepustowosc, max, "Przepustowosc.");
+        glowny_kod();
+        //int Om_KROK_X [][]= new int[Om.length][Om.length];
+        //kopiowanie_z_2_do_1(Om, Om_KROK_X);
+        zapis(Om_poczatek, przepustowosc);
+    }
+    
+    public static void odczyt() throws FileNotFoundException{
+        dane_wejsciowe = JOptionPane.showInputDialog( "Plik wejsciowy",  dane_wejsciowe);
+        //start =Integer.parseInt(JOptionPane.showInputDialog("Podaj punkt poczatkowy 1 - " + il_pkt + ":",  start));
+        O = odczyt2(dane_wejsciowe);
+        System.out.println("Ilosc punktow " + il_pkt);
+    }
+    
+    private static void tworzenie_tablic() {
+        Om = twożenie_maciezy_z_do_ilePkt_brakPoloczenia(O, Om, il_pkt+1, max);
+        Om_poczatek = kopiowanie_z_2_do_1(Om_poczatek, Om);
+        przepustowosc = new int [il_pkt+1];
+        odleglosc_od_zrodla = new int [il_pkt+1];
+        for (int i = 0; i < Om.length;i++)  //dodanie_punktu_0
+            Om[0][i]=0;
+        wypisanie_punktów(O, "Połączenia na grafie");
+        wypisanie_punktów_Tab2_Max_podpis_startOd(Om_poczatek, max,"Poczatkowe połączenia w macierzy.",1);
+        //wypisanie_punktów_Tab2_Max_podpis_startOd(Om, max, "Polaczenia odcinkow wypisane w macierzy po dodaniu pkt 0",0);
+    }
+}
